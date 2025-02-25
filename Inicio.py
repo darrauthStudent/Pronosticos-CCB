@@ -26,11 +26,11 @@ def main():
 
     with col1:
         if st.button("🔎 Análisis Exploratorio"):
-            st.switch_page("pages/1_ Analisis exploratorio de datos.py")
+            st.switch_page("pages/1_ Análisis exploratorio de datos.py")
 
     with col2:
         if st.button("📉 Descomposición de la Serie"):
-            st.switch_page("pages/2_descomposicion.py")
+            st.switch_page("pages/2_Analisis de descomposición.py.py")
 
     with col3:
         if st.button("📊 Resultados del Modelo"):

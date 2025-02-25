@@ -121,3 +121,45 @@ def sub_series(df, fecha_col, valor_col):
     
     # Mostrar en Streamlit
     st.plotly_chart(fig)
+
+
+
+
+
+import streamlit as st
+import plotly.graph_objects as go
+import pandas as pd
+from statsmodels.tsa.seasonal import seasonal_decompose, STL, MSTL
+from plotly.subplots import make_subplots
+
+# Función para descomponer la serie temporal y generar subgráficos
+def descomposicion_estacional(df, columna, periodo, metodo):
+    if len(df) < 2 * periodo:
+        st.warning(f"Para una descomposición precisa con un período de {periodo}, se requieren al menos {2 * periodo} observaciones. Tu conjunto de datos tiene {len(df)} observaciones.")
+        return None
+
+    if metodo in ['aditiva', 'multiplicativa']:
+        resultado = seasonal_decompose(df[columna], model=metodo, period=periodo)
+    elif metodo == 'stl':
+        resultado = STL(df[columna], period=periodo).fit()
+    elif metodo == 'mstl':
+        resultado = MSTL(df[columna], periods=[periodo]).fit()
+    else:
+        st.error("Método de descomposición no reconocido.")
+        return None
+
+    # Crear subgráficos
+    fig = make_subplots(rows=4, cols=1, shared_xaxes=True,
+                        subplot_titles=("Serie Observada", "Tendencia", "Estacionalidad", "Residuo"))
+
+    fig.add_trace(go.Scatter(x=df.index, y=resultado.observed, mode='lines', name='Observada'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df.index, y=resultado.trend, mode='lines', name='Tendencia'), row=2, col=1)
+    fig.add_trace(go.Scatter(x=df.index, y=resultado.seasonal, mode='lines', name='Estacionalidad'), row=3, col=1)
+    if metodo != 'mstl':
+        fig.add_trace(go.Scatter(x=df.index, y=resultado.resid, mode='lines', name='Residuo'), row=4, col=1)
+
+    fig.update_layout(height=800, width=800, title_text="Descomposición Estacional")
+    fig.update_xaxes(title_text="Fecha")
+    fig.update_yaxes(title_text=columna)
+
+    return fig
