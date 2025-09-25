@@ -1,5 +1,12 @@
-streamlit
-pandas
-numpy
-plotly 
-statsmodels
+# Core libraries for the application
+streamlit==1.41.1
+pandas==2.2.2
+numpy==2.1.1
+plotly==6.0.0
+
+# Time series analysis (install if needed for decomposition)
+statsmodels==0.14.4
+
+# Data processing and utilities
+pyarrow==18.1.0
+

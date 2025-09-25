@@ -1,0 +1,92 @@
+[
+  {
+    "name": "Ingresos Matrículas",
+    "path": "data/feather\\Ingresos Matrículas.feather",
+    "rows": 93,
+    "cols": [
+      "Fecha",
+      "Ingresos Matrículas"
+    ],
+    "dtypes": {
+      "Fecha": "period[M]",
+      "Ingresos Matrículas": "int64"
+    },
+    "optimizations": [],
+    "file_size_mb": 0.0
+  },
+  {
+    "name": "Ingresos Renovaciones",
+    "path": "data/feather\\Ingresos Renovaciones.feather",
+    "rows": 93,
+    "cols": [
+      "Fecha",
+      "Ingresos Renovaciones"
+    ],
+    "dtypes": {
+      "Fecha": "period[M]",
+      "Ingresos Renovaciones": "int64"
+    },
+    "optimizations": [],
+    "file_size_mb": 0.0
+  },
+  {
+    "name": "Ingresos ESAL",
+    "path": "data/feather\\Ingresos ESAL.feather",
+    "rows": 93,
+    "cols": [
+      "Fecha",
+      "Ingresos ESAL"
+    ],
+    "dtypes": {
+      "Fecha": "period[M]",
+      "Ingresos ESAL": "int64"
+    },
+    "optimizations": [],
+    "file_size_mb": 0.0
+  },
+  {
+    "name": "Matrícula Comerciante",
+    "path": "data/feather\\Matrícula Comerciante.feather",
+    "rows": 81,
+    "cols": [
+      "Fecha",
+      "Matrícula Comerciante"
+    ],
+    "dtypes": {
+      "Fecha": "period[M]",
+      "Matrícula Comerciante": "float64"
+    },
+    "optimizations": [],
+    "file_size_mb": 0.0
+  },
+  {
+    "name": "Renovados ESAL",
+    "path": "data/feather\\Renovados ESAL.feather",
+    "rows": 81,
+    "cols": [
+      "Fecha",
+      "Renovados ESAL"
+    ],
+    "dtypes": {
+      "Fecha": "period[M]",
+      "Renovados ESAL": "float64"
+    },
+    "optimizations": [],
+    "file_size_mb": 0.0
+  },
+  {
+    "name": "Renovados Comerciante",
+    "path": "data/feather\\Renovados Comerciante.feather",
+    "rows": 81,
+    "cols": [
+      "Fecha",
+      "Renovados Comerciante"
+    ],
+    "dtypes": {
+      "Fecha": "period[M]",
+      "Renovados Comerciante": "float64"
+    },
+    "optimizations": [],
+    "file_size_mb": 0.0
+  }
+]
