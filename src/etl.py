@@ -36,6 +36,10 @@ def export_dict_to_feather(data_dict, base_path="data/feather", manifest_path="d
     import json
     import pandas as pd
     
+    # Normalizar la ruta base para asegurar compatibilidad multiplataforma
+    base_path = os.path.normpath(base_path)
+    manifest_path = os.path.normpath(manifest_path)
+    
     # Crear directorio para archivos Feather
     os.makedirs(base_path, exist_ok=True)
     manifest = []
@@ -53,7 +57,7 @@ def export_dict_to_feather(data_dict, base_path="data/feather", manifest_path="d
                 df_optimized[col] = df_optimized[col].astype("category")
                 optimizations_applied.append(f"{col} -> category")
         
-        # Definir ruta del archivo
+        # Definir ruta del archivo usando os.path.join para compatibilidad multiplataforma
         path = os.path.join(base_path, f"{name}.feather")
         
         # Guardar con Feather v2 + compresión
@@ -69,6 +73,12 @@ def export_dict_to_feather(data_dict, base_path="data/feather", manifest_path="d
             "optimizations": optimizations_applied,
             "file_size_mb": round(os.path.getsize(path) / (1024*1024), 2)
         })
+    
+    # Guardar manifest con metadatos
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
+    
+    return manifest
     
     # Guardar manifest con metadatos
     with open(manifest_path, "w", encoding="utf-8") as f:
@@ -96,6 +106,9 @@ def load_dict_from_feather(manifest_path="data/feather_manifest.json"):
     import pandas as pd
     import os
     
+    # Normalizar la ruta del manifest
+    manifest_path = os.path.normpath(manifest_path)
+    
     if not os.path.exists(manifest_path):
         raise FileNotFoundError(f"No se encontró el manifest: {manifest_path}")
     
@@ -106,8 +119,15 @@ def load_dict_from_feather(manifest_path="data/feather_manifest.json"):
     data_dict = {}
     
     for item in manifest:
+        # Normalizar la ruta del archivo para asegurar compatibilidad multiplataforma
+        file_path = os.path.normpath(item["path"])
+        
+        # Verificar que el archivo existe antes de intentar cargarlo
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"No se encontró el archivo: {file_path}")
+        
         # Cargar DataFrame desde Feather
-        df = pd.read_feather(item["path"])
+        df = pd.read_feather(file_path)
         data_dict[item["name"]] = df
     
     return data_dict

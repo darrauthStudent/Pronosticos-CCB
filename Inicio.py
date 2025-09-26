@@ -33,8 +33,10 @@ def ensure_session_keys():
 @st.cache_data
 def load_data(_manifest_mtime=None):
     """Carga los datos desde archivos Feather usando cache para optimizar rendimiento"""
+    import os
     try:
-        diccionario_datos = load_dict_from_feather("data/feather_manifest.json")
+        manifest_path = os.path.normpath("data/feather_manifest.json")
+        diccionario_datos = load_dict_from_feather(manifest_path)
         return diccionario_datos
     except FileNotFoundError as e:
         st.error(f"Error cargando datos: {e}")
@@ -48,7 +50,8 @@ def get_manifest_mtime():
     """Obtiene la fecha de modificación del archivo manifest para invalidar cache"""
     import os
     try:
-        return os.path.getmtime("data/feather_manifest.json")
+        manifest_path = os.path.normpath("data/feather_manifest.json")
+        return os.path.getmtime(manifest_path)
     except:
         return 0
 
