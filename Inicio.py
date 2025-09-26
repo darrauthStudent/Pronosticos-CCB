@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 import hashlib
-from src.etl import load_dict_from_feather
+from src.etl import load_dict_from_csv
 
 # Configuracion de página
 st.set_page_config(page_title="Análisis de Series Temporales", layout="wide")
@@ -31,12 +31,11 @@ def ensure_session_keys():
         st.session_state.diccionario_datos = None
 
 @st.cache_data
-def load_data(_manifest_mtime=None):
-    """Carga los datos desde archivos Feather usando cache para optimizar rendimiento"""
+def load_data(_data_folder_mtime=None):
+    """Carga los datos desde archivos CSV usando cache para optimizar rendimiento"""
     import os
     try:
-        manifest_path = os.path.normpath("data/feather_manifest.json")
-        diccionario_datos = load_dict_from_feather(manifest_path)
+        diccionario_datos = load_dict_from_csv("data/csv")
         return diccionario_datos
     except FileNotFoundError as e:
         st.error(f"Error cargando datos: {e}")
@@ -46,12 +45,20 @@ def load_data(_manifest_mtime=None):
         st.error(f"Error inesperado cargando datos: {e}")
         return None
 
-def get_manifest_mtime():
-    """Obtiene la fecha de modificación del archivo manifest para invalidar cache"""
+def get_data_folder_mtime():
+    """Obtiene la fecha de modificación de la carpeta de datos para invalidar cache"""
     import os
     try:
-        manifest_path = os.path.normpath("data/feather_manifest.json")
-        return os.path.getmtime(manifest_path)
+        csv_folder = os.path.normpath("data/csv")
+        if os.path.exists(csv_folder):
+            # Obtener el tiempo de modificación más reciente de todos los archivos CSV
+            max_mtime = 0
+            for file in os.listdir(csv_folder):
+                if file.endswith('.csv'):
+                    file_path = os.path.join(csv_folder, file)
+                    max_mtime = max(max_mtime, os.path.getmtime(file_path))
+            return max_mtime
+        return 0
     except:
         return 0
 
@@ -121,8 +128,8 @@ def main():
     # Cargar datos si no están cargados
     if not st.session_state.data_loaded:
         with st.spinner("Cargando datos del sistema..."):
-            manifest_mtime = get_manifest_mtime()
-            diccionario_datos = load_data(_manifest_mtime=manifest_mtime)
+            data_folder_mtime = get_data_folder_mtime()
+            diccionario_datos = load_data(_data_folder_mtime=data_folder_mtime)
             if diccionario_datos is not None:
                 st.session_state.diccionario_datos = diccionario_datos
                 st.session_state.data_loaded = True

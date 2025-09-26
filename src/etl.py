@@ -7,165 +7,92 @@ import streamlit as st
 from typing import Tuple, Dict, Literal, Optional
 
 
-#################################################################### FUNCIONES DE LIMPIEZA Y PREPARACIÓN DE DATOS ########################################
+#################################################################### FUNCIONES PARA MANEJO DE ARCHIVOS CSV ########################################
 
-
-def export_dict_to_feather(data_dict, base_path="data/feather", manifest_path="data/feather_manifest.json", 
-                          compression="lz4", category_threshold=0.5):
+def export_dict_to_csv(data_dict, base_path="data/csv"):
     """
-    Exporta un diccionario de DataFrames a formato Feather v2 con compresión.
+    Exporta un diccionario de DataFrames a formato CSV.
     
     Parámetros:
     -----------
     data_dict : dict
         Diccionario con DataFrames a exportar
     base_path : str
-        Ruta base donde guardar los archivos .feather
-    manifest_path : str  
-        Ruta donde guardar el archivo manifest JSON
-    compression : str
-        Tipo de compresión ('lz4', 'zstd', 'uncompressed')
-    category_threshold : float
-        Umbral para convertir columnas a category (0.0-1.0)
+        Ruta base donde guardar los archivos .csv
         
     Retorna:
     --------
-    dict: Manifest con metadatos de los archivos exportados
+    list: Lista con los nombres de los archivos exportados
     """
     import os
-    import json
-    import pandas as pd
     
-    # Normalizar la ruta base para asegurar compatibilidad multiplataforma
+    # Normalizar la ruta base
     base_path = os.path.normpath(base_path)
-    manifest_path = os.path.normpath(manifest_path)
     
-    # Crear directorio para archivos Feather
+    # Crear directorio para archivos CSV
     os.makedirs(base_path, exist_ok=True)
-    manifest = []
+    exported_files = []
     
     for name, df in data_dict.items():
-        # Crear copia para no modificar el original
-        df_optimized = df.copy()
+        # Definir ruta del archivo
+        file_name = f"{name}.csv"
+        path = os.path.join(base_path, file_name)
         
-        # Optimizaciones de tamaño y rendimiento
-        optimizations_applied = []
-        for col in df_optimized.select_dtypes("object"):
-            # Convierte a category si hay alta repetición
-            unique_ratio = df_optimized[col].nunique(dropna=False) / max(len(df_optimized), 1)
-            if unique_ratio < category_threshold:
-                df_optimized[col] = df_optimized[col].astype("category")
-                optimizations_applied.append(f"{col} -> category")
+        # Guardar como CSV con encoding UTF-8
+        df.to_csv(path, index=False, encoding='utf-8')
+        exported_files.append(file_name)
+        print(f"Exportado: {file_name} ({len(df)} filas)")
+    
+    return exported_files
+
+
+def load_dict_from_csv(base_path="data/csv"):
+    """
+    Carga todos los archivos CSV de una carpeta en un diccionario de DataFrames.
+    
+    Parámetros:
+    -----------
+    base_path : str
+        Ruta base donde están los archivos .csv
         
-        # Definir ruta del archivo usando os.path.join para compatibilidad multiplataforma
-        path = os.path.join(base_path, f"{name}.feather")
-        
-        # Guardar con Feather v2 + compresión
-        df_optimized.to_feather(path, compression=compression, version=2)
-        
-        # Agregar información al manifest
-        manifest.append({
-            "name": name, 
-            "path": path, 
-            "rows": len(df_optimized), 
-            "cols": list(df_optimized.columns),
-            "dtypes": {col: str(dtype) for col, dtype in df_optimized.dtypes.items()},
-            "optimizations": optimizations_applied,
-            "file_size_mb": round(os.path.getsize(path) / (1024*1024), 2)
-        })
+    Retorna:
+    --------
+    dict: Diccionario con los DataFrames cargados
+    """
+    import os
+    import pandas as pd
+    from pathlib import Path
     
-    # Guardar manifest con metadatos
-    with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump(manifest, f, ensure_ascii=False, indent=2)
+    # Normalizar la ruta base
+    base_path = os.path.normpath(base_path)
     
-    return manifest
+    if not os.path.exists(base_path):
+        raise FileNotFoundError(f"No se encontró la carpeta: {base_path}")
     
-    # Guardar manifest con metadatos
-    with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump(manifest, f, ensure_ascii=False, indent=2)
-    
-    return manifest
-
-
-from pathlib import Path
-import json
-import unicodedata
-import pandas as pd
-import os
-
-def _strip_accents(s: str) -> str:
-    # elimina acentos para comparar nombres si hay diferencias de normalización
-    return ''.join(ch for ch in unicodedata.normalize('NFKD', s) if not unicodedata.combining(ch)).casefold()
-
-def load_dict_from_feather(manifest_path="data/feather_manifest.json"):
-    manifest_path = Path(manifest_path)
-    if not manifest_path.exists():
-        raise FileNotFoundError(f"No se encontró el manifest: {manifest_path}")
-
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     data_dict = {}
-
-    # Base dir donde deberían estar los .feather
-    base_dir = manifest_path.parent / "feather"
-    # Lista real de archivos presentes en el deploy
-    present_files = list(base_dir.glob("*.feather"))
-
-    # Índices para búsqueda tolerante a acentos y mayúsculas
-    present_by_name = {p.name: p for p in present_files}
-    present_by_key  = {_strip_accents(p.name): p for p in present_files}
-
-    for item in manifest:
-        # 1) normaliza barras invertidas del JSON
-        raw_path = item["path"].replace("\\", "/")
-        p = Path(raw_path)
-
-        # 2) si la ruta del JSON es relativa, intenta tal cual
-        if not p.is_absolute():
-            p = Path(*Path(raw_path).parts)  # reconstruye con separadores correctos
-
-        # 3) intentos en orden:
-        candidates = []
-
-        # a) ruta tal cual normalizada (si es relativa, será relativa al CWD del app)
-        candidates.append(Path(str(p)))
-
-        # b) mismo nombre de archivo pero dentro de base_dir del deploy
-        candidates.append(base_dir / Path(raw_path).name)
-
-        # c) búsqueda tolerante a acentos/case
-        wanted_key = _strip_accents(Path(raw_path).name)
-        if wanted_key in present_by_key:
-            candidates.append(present_by_key[wanted_key])
-
-        target = None
-        for c in candidates:
-            if c.exists():
-                target = c
-                break
-
-        if target is None:
-            # Mensaje claro con lo que sí existe en el deploy
-            inv = ", ".join(sorted(p.name for p in present_files)) or "(no hay .feather)"
-            raise FileNotFoundError(
-                f"No se encontró el archivo indicado en manifest: {raw_path}\n"
-                f"Busqué en: {base_dir.resolve()}\n"
-                f"Archivos presentes: {inv}"
-            )
-
-        # 4) lee el feather
-        df = pd.read_feather(target)
-        data_dict[item["name"]] = df
-
+    csv_files = Path(base_path).glob("*.csv")
+    
+    for csv_file in csv_files:
+        # El nombre del dataset será el nombre del archivo sin extensión
+        name = csv_file.stem
+        
+        # Cargar DataFrame desde CSV
+        df = pd.read_csv(csv_file, encoding='utf-8')
+        
+        # Convertir la columna Fecha a datetime si existe
+        if 'Fecha' in df.columns:
+            df['Fecha'] = pd.to_datetime(df['Fecha'])
+        
+        data_dict[name] = df
+    
+    if not data_dict:
+        raise FileNotFoundError(f"No se encontraron archivos CSV en: {base_path}")
+    
     return data_dict
 
 
+#################################################################### FUNCIONES DE LIMPIEZA Y PREPARACIÓN DE DATOS ########################################
 
-
-
-
-##################################################################################################################################
-
-# Definir la función para convertir una columna en tipo datetime
 def convert_to_datetime(df, column_name):
     """
     Convierte una columna específica de un DataFrame en formato datetime.
@@ -240,6 +167,7 @@ def preparar_datos_subseries(
     out["Nombre Mes"] = out[date_col].dt.strftime("%B")
     media_mensual = out.groupby("Mes")[value_col].mean().to_dict()
     return out, media_mensual
+
 
 def series_indexed(
     df: pd.DataFrame,
