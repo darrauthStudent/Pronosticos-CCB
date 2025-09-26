@@ -1,9 +1,19 @@
 import pandas as pd
 import streamlit as st
 import hashlib
+import sys
+import os
+
+# Agregar el directorio actual al path para imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
+
+try:
+    import pandas as pd
+import streamlit as st
+import hashlib
 import os
 from pathlib import Path
-
 
 def load_dict_from_csv(base_path="data/csv"):
     """
@@ -35,7 +45,10 @@ def load_dict_from_csv(base_path="data/csv"):
         raise FileNotFoundError(f"No se encontraron archivos CSV en: {base_path}")
     
     return data_dict
-
+except ImportError:
+    # Fallback si no puede importar desde src
+    sys.path.insert(0, os.path.join(current_dir, 'src'))
+    from etl import load_dict_from_csv
 
 # Configuracion de página
 st.set_page_config(page_title="Análisis de Series Temporales", layout="wide")
@@ -44,6 +57,7 @@ st.set_page_config(page_title="Análisis de Series Temporales", layout="wide")
 # ⚠️ Reemplaza por tu propio mecanismo (BD, secrets, etc.)
 # Guarda contraseñas como SHA256 de texto plano solo para demo.
 # En producción usa bcrypt/argon2 y almacén seguro.
+
 
 USERS = {
     "admin": hashlib.sha256("1234".encode()).hexdigest(),
@@ -66,6 +80,7 @@ def ensure_session_keys():
 @st.cache_data
 def load_data(_data_folder_mtime=None):
     """Carga los datos desde archivos CSV usando cache para optimizar rendimiento"""
+    import os
     try:
         diccionario_datos = load_dict_from_csv("data/csv")
         return diccionario_datos
@@ -79,6 +94,7 @@ def load_data(_data_folder_mtime=None):
 
 def get_data_folder_mtime():
     """Obtiene la fecha de modificación de la carpeta de datos para invalidar cache"""
+    import os
     try:
         csv_folder = os.path.normpath("data/csv")
         if os.path.exists(csv_folder):
@@ -178,8 +194,9 @@ def main():
     - **Ver un resumen estadístico** de las pruebas realizadas.
     """)
 
+
     st.markdown("---")
-    st.info("Desarrollado con Streamlit | Visítamos en: [www.miempresa.com](https://www.miempresa.com)")
+    st.info("Desarrollado con Streamlit | Visítanos en: [www.miempresa.com](https://www.miempresa.com)")
 
 if __name__ == "__main__":
     main()
