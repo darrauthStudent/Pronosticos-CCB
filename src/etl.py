@@ -90,46 +90,27 @@ def export_dict_to_feather(data_dict, base_path="data/feather", manifest_path="d
 
 # FUNCIÓN PARA CARGAR DE VUELTA LOS DATOS DESDE FEATHER
 def load_dict_from_feather(manifest_path="data/feather_manifest.json"):
-    """
-    Carga un diccionario de DataFrames desde archivos Feather usando el manifest.
-    
-    Parámetros:
-    -----------
-    manifest_path : str
-        Ruta al archivo manifest JSON
-        
-    Retorna:
-    --------
-    dict: Diccionario con los DataFrames cargados
-    """
-    import json
-    import pandas as pd
-    import os
-    
-    # Normalizar la ruta del manifest
+    import json, os, pandas as pd
+
     manifest_path = os.path.normpath(manifest_path)
-    
     if not os.path.exists(manifest_path):
         raise FileNotFoundError(f"No se encontró el manifest: {manifest_path}")
-    
-    # Cargar manifest
+
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
-    
+
     data_dict = {}
-    
     for item in manifest:
-        # Normalizar la ruta del archivo para asegurar compatibilidad multiplataforma
-        file_path = os.path.normpath(item["path"])
-        
-        # Verificar que el archivo existe antes de intentar cargarlo
+        # 🔧 Normaliza rutas guardadas en Windows para que funcionen en Linux
+        file_path = item["path"].replace("\\", "/")
+        file_path = os.path.normpath(file_path)
+
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"No se encontró el archivo: {file_path}")
-        
-        # Cargar DataFrame desde Feather
+
         df = pd.read_feather(file_path)
         data_dict[item["name"]] = df
-    
+
     return data_dict
 
 
