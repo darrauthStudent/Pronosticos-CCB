@@ -87,32 +87,76 @@ def export_dict_to_feather(data_dict, base_path="data/feather", manifest_path="d
     return manifest
 
 
+from pathlib import Path
+import json
+import unicodedata
+import pandas as pd
+import os
 
-# FUNCIÓN PARA CARGAR DE VUELTA LOS DATOS DESDE FEATHER
+def _strip_accents(s: str) -> str:
+    # elimina acentos para comparar nombres si hay diferencias de normalización
+    return ''.join(ch for ch in unicodedata.normalize('NFKD', s) if not unicodedata.combining(ch)).casefold()
+
 def load_dict_from_feather(manifest_path="data/feather_manifest.json"):
-    import json, os, pandas as pd
-
-    manifest_path = os.path.normpath(manifest_path)
-    if not os.path.exists(manifest_path):
+    manifest_path = Path(manifest_path)
+    if not manifest_path.exists():
         raise FileNotFoundError(f"No se encontró el manifest: {manifest_path}")
 
-    with open(manifest_path, "r", encoding="utf-8") as f:
-        manifest = json.load(f)
-
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     data_dict = {}
+
+    # Base dir donde deberían estar los .feather
+    base_dir = manifest_path.parent / "feather"
+    # Lista real de archivos presentes en el deploy
+    present_files = list(base_dir.glob("*.feather"))
+
+    # Índices para búsqueda tolerante a acentos y mayúsculas
+    present_by_name = {p.name: p for p in present_files}
+    present_by_key  = {_strip_accents(p.name): p for p in present_files}
+
     for item in manifest:
-        # 🔧 Normaliza rutas guardadas en Windows para que funcionen en Linux
-        file_path = item["path"].replace("\\", "/")
-        file_path = os.path.normpath(file_path)
+        # 1) normaliza barras invertidas del JSON
+        raw_path = item["path"].replace("\\", "/")
+        p = Path(raw_path)
 
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"No se encontró el archivo: {file_path}")
+        # 2) si la ruta del JSON es relativa, intenta tal cual
+        if not p.is_absolute():
+            p = Path(*Path(raw_path).parts)  # reconstruye con separadores correctos
 
-        df = pd.read_feather(file_path)
+        # 3) intentos en orden:
+        candidates = []
+
+        # a) ruta tal cual normalizada (si es relativa, será relativa al CWD del app)
+        candidates.append(Path(str(p)))
+
+        # b) mismo nombre de archivo pero dentro de base_dir del deploy
+        candidates.append(base_dir / Path(raw_path).name)
+
+        # c) búsqueda tolerante a acentos/case
+        wanted_key = _strip_accents(Path(raw_path).name)
+        if wanted_key in present_by_key:
+            candidates.append(present_by_key[wanted_key])
+
+        target = None
+        for c in candidates:
+            if c.exists():
+                target = c
+                break
+
+        if target is None:
+            # Mensaje claro con lo que sí existe en el deploy
+            inv = ", ".join(sorted(p.name for p in present_files)) or "(no hay .feather)"
+            raise FileNotFoundError(
+                f"No se encontró el archivo indicado en manifest: {raw_path}\n"
+                f"Busqué en: {base_dir.resolve()}\n"
+                f"Archivos presentes: {inv}"
+            )
+
+        # 4) lee el feather
+        df = pd.read_feather(target)
         data_dict[item["name"]] = df
 
     return data_dict
-
 
 
 
