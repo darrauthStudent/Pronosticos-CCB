@@ -38,7 +38,7 @@ def load_dict_from_csv(base_path="data/csv"):
 
 
 # Configuracion de página
-st.set_page_config(page_title="Análisis de Series Temporales", layout="wide")
+st.set_page_config(page_title="🏠 Análisis de Series Temporales", page_icon="🏠", layout="wide")
 
 # --- Seguridad muy básica (ejemplo) ---
 # ⚠️ Reemplaza por tu propio mecanismo (BD, secrets, etc.)

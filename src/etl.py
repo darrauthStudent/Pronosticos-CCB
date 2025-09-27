@@ -46,7 +46,7 @@ def export_dict_to_csv(data_dict, base_path="data/csv"):
     return exported_files
 
 
-def load_dict_from_csv(base_path="data/csv"):
+def load_dict_from_csv(base_path="data/csv", parse_dates=False):
     """
     Carga todos los archivos CSV de una carpeta en un diccionario de DataFrames.
     
@@ -54,6 +54,9 @@ def load_dict_from_csv(base_path="data/csv"):
     -----------
     base_path : str
         Ruta base donde están los archivos .csv
+    parse_dates : bool
+        Si es True, parsea automáticamente la columna 'Fecha' como datetime.
+        Si es False (por defecto), no hace conversión automática.
         
     Retorna:
     --------
@@ -76,12 +79,28 @@ def load_dict_from_csv(base_path="data/csv"):
         # El nombre del dataset será el nombre del archivo sin extensión
         name = csv_file.stem
         
-        # Cargar DataFrame desde CSV
-        df = pd.read_csv(csv_file, encoding='utf-8')
-        
-        # Convertir la columna Fecha a datetime si existe
-        if 'Fecha' in df.columns:
-            df['Fecha'] = pd.to_datetime(df['Fecha'])
+        # Cargar DataFrame desde CSV con o sin parse_dates
+        if parse_dates:
+            # Primero leer una muestra para detectar la columna de fecha
+            sample_df = pd.read_csv(csv_file, nrows=1, encoding='utf-8')
+            date_columns = []
+            
+            # Buscar columnas que podrían ser fechas
+            for col in sample_df.columns:
+                if any(keyword in col.lower() for keyword in ['fecha', 'date', 'time', 'ds']):
+                    date_columns.append(col)
+            
+            # Cargar con parse_dates si encontramos columnas de fecha
+            if date_columns:
+                df = pd.read_csv(csv_file, encoding='utf-8', parse_dates=date_columns)
+            else:
+                df = pd.read_csv(csv_file, encoding='utf-8')
+        else:
+            df = pd.read_csv(csv_file, encoding='utf-8')
+            
+            # Convertir la columna Fecha a datetime si existe (comportamiento anterior)
+            if 'Fecha' in df.columns:
+                df['Fecha'] = pd.to_datetime(df['Fecha'])
         
         data_dict[name] = df
     
@@ -187,3 +206,64 @@ def series_indexed(
         else:
             raise ValueError("agg debe ser 'sum', 'mean' o 'first'.")
     return tmp[value_col]
+
+
+#################################################################### FUNCIONES PARA STREAMLIT - CARGA DE DATOS ########################################
+
+@st.cache_data
+def load_historical_data():
+    """Carga los datos históricos de ingresos por renovaciones"""
+    try:
+        df = pd.read_csv('data/csv/Ingresos Renovaciones.csv')
+        df['Fecha'] = pd.to_datetime(df['Fecha'])
+        return df
+    except Exception as e:
+        st.error(f"Error al cargar datos históricos: {str(e)}")
+        return None
+
+
+@st.cache_data
+def load_forecast_data():
+    """Carga los datos de pronósticos"""
+    try:
+        df = pd.read_csv('data/model_outputs/Pronostico Ingresos Renovaciones.csv')
+        df['Fecha'] = pd.to_datetime(df['Fecha'])
+        return df
+    except Exception as e:
+        st.error(f"Error al cargar datos de pronóstico: {str(e)}")
+        return None
+
+
+def combine_data_for_download(historical_df, forecast_df):
+    """Combina los datos históricos y de pronóstico para descarga"""
+    
+    # Preparar datos históricos
+    historical_clean = historical_df.copy()
+    historical_clean = historical_clean.rename(columns={'Ingresos Renovaciones': 'Valor'})
+    historical_clean['Tipo'] = 'Histórico'
+    historical_clean['IC_90_Inferior'] = None
+    historical_clean['IC_90_Superior'] = None
+    historical_clean['IC_95_Inferior'] = None
+    historical_clean['IC_95_Superior'] = None
+    
+    # Preparar datos de pronóstico
+    forecast_clean = forecast_df.copy()
+    forecast_clean = forecast_clean.rename(columns={
+        'ESM': 'Valor',
+        'ESM-lo-90': 'IC_90_Inferior',
+        'ESM-hi-90': 'IC_90_Superior',
+        'ESM-lo-95': 'IC_95_Inferior',
+        'ESM-hi-95': 'IC_95_Superior'
+    })
+    forecast_clean['Tipo'] = 'Pronóstico'
+    
+    # Combinar datos
+    combined_df = pd.concat([
+        historical_clean[['Fecha', 'Valor', 'Tipo', 'IC_90_Inferior', 'IC_90_Superior', 'IC_95_Inferior', 'IC_95_Superior']],
+        forecast_clean[['Fecha', 'Valor', 'Tipo', 'IC_90_Inferior', 'IC_90_Superior', 'IC_95_Inferior', 'IC_95_Superior']]
+    ], ignore_index=True)
+    
+    # Ordenar por fecha
+    combined_df = combined_df.sort_values('Fecha').reset_index(drop=True)
+    
+    return combined_df
