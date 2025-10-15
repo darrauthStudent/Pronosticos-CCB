@@ -228,11 +228,11 @@ def plot_ets_decomposition(original_data, fitted_model, title="ETS Decomposition
 
 
 def plot_residual_analysis(residuals, fitted_values=None, title="Análisis de Residuales", 
-                          figsize=(15, 12), bins=15, lags=20):
+                          figsize=(18, 12), bins=15, lags=20, dates=None):
     """
-    Crea un análisis gráfico completo de residuales con 4 subplots:
+    Crea un análisis gráfico completo de residuales con 5 subplots:
     histograma con curva normal, Q-Q plot, scatter de valores ajustados vs residuales,
-    y autocorrelación de residuales.
+    autocorrelación de residuales, y serie de tiempo de residuales.
     
     Parameters:
     -----------
@@ -242,20 +242,22 @@ def plot_residual_analysis(residuals, fitted_values=None, title="Análisis de Re
         Los valores ajustados del modelo. Si no se proporciona, se usa el índice
     title : str, default="Análisis de Residuales"
         Título principal para el análisis
-    figsize : tuple, default=(15, 12)
+    figsize : tuple, default=(18, 12)
         Tamaño de la figura (ancho, alto)
     bins : int, default=15
         Número de bins para el histograma
     lags : int, default=20
         Número de lags para el gráfico de autocorrelación
+    dates : array-like, optional
+        Las fechas correspondientes a cada residual para el gráfico de serie temporal
         
     Returns:
     --------
     fig, axes
         La figura y los ejes de matplotlib para personalización adicional
     """
-    # Crear figura con subplots 2x2
-    fig, axes = plt.subplots(2, 2, figsize=figsize)
+    # Crear figura con subplots 2x3 (agregamos un gráfico más)
+    fig, axes = plt.subplots(2, 3, figsize=figsize)
     
     # 1. Histograma con curva normal
     axes[0,0].hist(residuals, bins=bins, density=True, alpha=0.7, 
@@ -275,7 +277,49 @@ def plot_residual_analysis(residuals, fitted_values=None, title="Análisis de Re
     axes[0,1].set_title('Q-Q Plot (Normalidad)')
     axes[0,1].grid(True, alpha=0.3)
 
-    # 3. Fitted vs Residuals
+    # 3. Serie de tiempo de residuales (GRÁFICO MODIFICADO CON FECHAS)
+    if dates is not None:
+        import pandas as pd
+        # Convertir fechas a pandas datetime si no lo están
+        if not isinstance(dates, pd.DatetimeIndex):
+            dates = pd.to_datetime(dates)
+        x_vals_time = dates
+        x_label_time = 'Fecha'
+        
+        # Configurar formato de fechas en el eje x
+        import matplotlib.dates as mdates
+        axes[0,2].plot(x_vals_time, residuals, 'b-', linewidth=1.5, alpha=0.8)
+        axes[0,2].axhline(y=0, color='red', linestyle='--', alpha=0.8)
+        axes[0,2].scatter(x_vals_time, residuals, alpha=0.4, s=15, color='blue')
+        
+        # Formatear eje x con fechas
+        axes[0,2].xaxis.set_major_locator(mdates.YearLocator())
+        axes[0,2].xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+        axes[0,2].xaxis.set_minor_locator(mdates.MonthLocator())
+        
+        # Rotar etiquetas para mejor legibilidad
+        for tick in axes[0,2].get_xticklabels():
+            tick.set_rotation(45)
+    else:
+        # Usar índices numéricos si no hay fechas
+        x_vals_time = range(len(residuals))
+        x_label_time = 'Tiempo (Índice)'
+        axes[0,2].plot(x_vals_time, residuals, 'b-', linewidth=1.5, alpha=0.8)
+        axes[0,2].axhline(y=0, color='red', linestyle='--', alpha=0.8)
+        axes[0,2].scatter(x_vals_time, residuals, alpha=0.4, s=15, color='blue')
+    
+    axes[0,2].set_title('Serie de Tiempo de Residuales')
+    axes[0,2].set_xlabel(x_label_time)
+    axes[0,2].set_ylabel('Residuales')
+    axes[0,2].grid(True, alpha=0.3)
+    
+    # Agregar líneas de confianza (±2σ)
+    std_residuals = np.std(residuals)
+    axes[0,2].axhline(y=2*std_residuals, color='orange', linestyle=':', alpha=0.7, label='+2σ')
+    axes[0,2].axhline(y=-2*std_residuals, color='orange', linestyle=':', alpha=0.7, label='-2σ')
+    axes[0,2].legend()
+
+    # 4. Fitted vs Residuals
     if fitted_values is not None:
         x_vals = fitted_values
         x_label = 'Valores Ajustados'
@@ -290,10 +334,23 @@ def plot_residual_analysis(residuals, fitted_values=None, title="Análisis de Re
     axes[1,0].set_ylabel('Residuales')
     axes[1,0].grid(True, alpha=0.3)
 
-    # 4. Autocorrelación de residuales
+    # 5. Autocorrelación de residuales
     plot_acf(residuals, lags=lags, ax=axes[1,1], alpha=0.05)
     axes[1,1].set_title('Autocorrelación de Residuales')
     axes[1,1].grid(True, alpha=0.3)
+    
+    # 6. Dejar el último subplot vacío o agregar información estadística
+    axes[1,2].text(0.1, 0.8, f'Estadísticas Descriptivas:', fontsize=14, fontweight='bold', transform=axes[1,2].transAxes)
+    axes[1,2].text(0.1, 0.7, f'Media: {np.mean(residuals):.6f}', fontsize=12, transform=axes[1,2].transAxes)
+    axes[1,2].text(0.1, 0.6, f'Desv. Estándar: {np.std(residuals):.6f}', fontsize=12, transform=axes[1,2].transAxes)
+    axes[1,2].text(0.1, 0.5, f'Sesgo: {stats.skew(residuals):.6f}', fontsize=12, transform=axes[1,2].transAxes)
+    axes[1,2].text(0.1, 0.4, f'Curtosis: {stats.kurtosis(residuals):.6f}', fontsize=12, transform=axes[1,2].transAxes)
+    axes[1,2].text(0.1, 0.3, f'Mín: {np.min(residuals):.6f}', fontsize=12, transform=axes[1,2].transAxes)
+    axes[1,2].text(0.1, 0.2, f'Máx: {np.max(residuals):.6f}', fontsize=12, transform=axes[1,2].transAxes)
+    axes[1,2].text(0.1, 0.1, f'N° Observaciones: {len(residuals)}', fontsize=12, transform=axes[1,2].transAxes)
+    axes[1,2].set_title('Estadísticas Descriptivas')
+    axes[1,2].set_xticks([])
+    axes[1,2].set_yticks([])
 
     plt.suptitle(title, fontsize=16, y=1.02)
     plt.tight_layout()
@@ -973,3 +1030,164 @@ def export_data(data, filename, output_dir='data/model_outputs',
     print("=" * 50)
     
     return file_path
+
+
+def plot_histogram_boxplot(df, column, title=None, xlabel=None, ylabel=None, bins=30, figsize=(12, 8), layout='vertical'):
+    """
+    Función integrada para crear un histograma y diagrama de caja y bigotes de una columna específica.
+    
+    Parámetros:
+    -----------
+    df : pandas.DataFrame
+        DataFrame que contiene los datos
+    column : str
+        Nombre de la columna a analizar
+    title : str, opcional
+        Título principal para la figura
+    xlabel : str, opcional
+        Etiqueta para el eje X (si no se proporciona, usa el nombre de la columna)
+    ylabel : str, opcional
+        Etiqueta para el eje Y del histograma
+    bins : int, opcional
+        Número de bins para el histograma (default: 30)
+    figsize : tuple, opcional
+        Tamaño de la figura (ancho, alto) (default: (12, 8))
+    layout : str, opcional
+        Disposición de los gráficos: 'vertical' (uno arriba del otro) o 'horizontal' (lado a lado)
+    
+    Returns:
+    --------
+    fig, axes : matplotlib figure and axes objects
+        Objetos de la figura y ejes para personalización adicional si es necesario
+    """
+    
+    # Verificar que la columna existe en el DataFrame
+    if column not in df.columns:
+        raise ValueError(f"La columna '{column}' no existe en el DataFrame")
+    
+    # Eliminar valores nulos para el análisis
+    data_clean = df[column].dropna()
+    
+    if len(data_clean) == 0:
+        raise ValueError(f"La columna '{column}' no contiene datos válidos")
+    
+    # Configurar títulos por defecto si no se proporcionan
+    if title is None:
+        title = f"Análisis de Distribución - {column}"
+    if xlabel is None:
+        xlabel = column
+    if ylabel is None:
+        ylabel = "Frecuencia"
+    
+    # Calcular estadísticas
+    mean_val = data_clean.mean()
+    median_val = data_clean.median()
+    std_val = data_clean.std()
+    Q1 = data_clean.quantile(0.25)
+    Q3 = data_clean.quantile(0.75)
+    IQR = Q3 - Q1
+    
+    # Configurar layout de subplots
+    if layout == 'vertical':
+        fig, axes = plt.subplots(2, 1, figsize=figsize, gridspec_kw={'height_ratios': [3, 1]})
+    else:  # horizontal
+        fig, axes = plt.subplots(1, 2, figsize=figsize, gridspec_kw={'width_ratios': [3, 1]})
+    
+    fig.suptitle(title, fontsize=16, fontweight='bold', y=0.95)
+    
+    # Colores consistentes
+    hist_color = '#3498db'  # Azul
+    mean_color = '#e74c3c'  # Rojo
+    median_color = '#2ecc71'  # Verde
+    box_color = '#9b59b6'    # Púrpura
+    
+    if layout == 'vertical':
+        # HISTOGRAMA (arriba)
+        n, bins_edges, patches = axes[0].hist(data_clean, bins=bins, alpha=0.8, 
+                                             color=hist_color, edgecolor='white', linewidth=0.8)
+        axes[0].set_ylabel(ylabel, fontsize=12)
+        axes[0].set_title('Distribución de Frecuencias', fontsize=14, pad=10)
+        axes[0].grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+        
+        # Líneas de estadísticas con mejor visibilidad
+        axes[0].axvline(mean_val, color=mean_color, linestyle='--', linewidth=2.5, 
+                       label=f'Media: {mean_val:.2f}', alpha=0.9)
+        axes[0].axvline(median_val, color=median_color, linestyle='--', linewidth=2.5, 
+                       label=f'Mediana: {median_val:.2f}', alpha=0.9)
+        
+        # Añadir área de ±1 desviación estándar
+        axes[0].axvspan(mean_val - std_val, mean_val + std_val, alpha=0.2, 
+                       color=mean_color, label=f'±1σ: {std_val:.2f}')
+        
+        axes[0].legend(loc='upper right', frameon=True, fancybox=True, shadow=True)
+        
+        # BOXPLOT (abajo) - horizontal para mejor integración
+        box_plot = axes[1].boxplot(data_clean, vert=False, patch_artist=True, 
+                                  widths=0.6, showmeans=True, meanline=True)
+        axes[1].set_xlabel(xlabel, fontsize=12)
+        axes[1].set_title('Diagrama de Caja y Bigotes', fontsize=14, pad=10)
+        axes[1].grid(True, alpha=0.3, axis='x')
+        
+        # Colorear y personalizar el boxplot
+        for patch in box_plot['boxes']:
+            patch.set_facecolor(box_color)
+            patch.set_alpha(0.7)
+        
+        # Personalizar elementos del boxplot
+        for element in ['whiskers', 'fliers', 'caps']:
+            plt.setp(box_plot[element], color='black', linewidth=1.5)
+        plt.setp(box_plot['medians'], color='white', linewidth=2.5)
+        plt.setp(box_plot['means'], color=mean_color, linewidth=2.5)
+        
+        # Sincronizar ejes X
+        axes[1].set_xlim(axes[0].get_xlim())
+        
+    else:  # horizontal layout
+        # HISTOGRAMA (izquierda)
+        n, bins_edges, patches = axes[0].hist(data_clean, bins=bins, alpha=0.8, 
+                                             color=hist_color, edgecolor='white', linewidth=0.8)
+        axes[0].set_xlabel(xlabel, fontsize=12)
+        axes[0].set_ylabel(ylabel, fontsize=12)
+        axes[0].set_title('Distribución de Frecuencias', fontsize=14)
+        axes[0].grid(True, alpha=0.3)
+        
+        # Líneas de estadísticas
+        axes[0].axvline(mean_val, color=mean_color, linestyle='--', linewidth=2.5, 
+                       label=f'Media: {mean_val:.2f}')
+        axes[0].axvline(median_val, color=median_color, linestyle='--', linewidth=2.5, 
+                       label=f'Mediana: {median_val:.2f}')
+        axes[0].legend()
+        
+        # BOXPLOT (derecha) - vertical
+        box_plot = axes[1].boxplot(data_clean, patch_artist=True, widths=0.6, 
+                                  showmeans=True, meanline=True)
+        axes[1].set_ylabel(xlabel, fontsize=12)
+        axes[1].set_title('Boxplot', fontsize=14)
+        axes[1].grid(True, alpha=0.3, axis='y')
+        
+        # Colorear el boxplot
+        for patch in box_plot['boxes']:
+            patch.set_facecolor(box_color)
+            patch.set_alpha(0.7)
+    
+    # Detectar outliers
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    outliers = data_clean[(data_clean < lower_bound) | (data_clean > upper_bound)]
+    
+    # Mostrar estadísticas descriptivas integradas
+    stats_text = f"""📊 ESTADÍSTICAS DESCRIPTIVAS
+{'='*45}
+N observaciones: {len(data_clean):,}
+Media: {mean_val:.2f} | Mediana: {median_val:.2f}
+Desv. Estándar: {std_val:.2f}
+Q1: {Q1:.2f} | Q3: {Q3:.2f} | IQR: {IQR:.2f}
+Min: {data_clean.min():.2f} | Max: {data_clean.max():.2f}
+Outliers: {len(outliers)} ({len(outliers)/len(data_clean)*100:.1f}%)"""
+    
+    print(stats_text)
+    
+    # Ajustar espaciado
+    plt.tight_layout()
+    
+    return fig, axes

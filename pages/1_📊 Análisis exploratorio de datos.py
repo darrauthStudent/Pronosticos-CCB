@@ -43,17 +43,6 @@ def main():
             help="Elige la variable que deseas analizar"
         )
         
-        # Transformaciones
-        st.subheader("🔧 Transformaciones")
-        aplicar_log = st.checkbox(
-            "🔢 Aplicar transformación logarítmica",
-            value=False,
-            help="Aplica log natural para estabilizar varianza y tendencias exponenciales"
-        )
-        
-        if aplicar_log:
-            st.info("ℹ️ Se aplicará ln(x+1) para evitar problemas con valores cero")
-        
         # Información de la serie seleccionada
         if serie_seleccionada:
             df_serie = diccionario_datos[serie_seleccionada]
@@ -82,9 +71,6 @@ def main():
             ➖ **Valores negativos:** {valores_negativos}
             """)
             
-            if aplicar_log and valores_negativos > 0:
-                st.warning("⚠️ La serie contiene valores negativos. La transformación logarítmica podría no ser apropiada.")
-            
             # Verificar que se haya seleccionado una serie
             if not serie_seleccionada:
                 st.warning("⚠️ Por favor selecciona una serie temporal para analizar.")
@@ -107,27 +93,27 @@ def main():
             # Renombrar columnas para compatibilidad con las funciones existentes
             df = df.rename(columns={fecha_col: 'Fecha', serie_seleccionada: 'Ingreso'})
     
-    # Aplicar transformación logarítmica si está seleccionada
-    valor_original = 'Ingreso'
-    if aplicar_log:
-        # Verificar valores negativos
-        if (df['Ingreso'] < 0).any():
-            st.error("❌ No se puede aplicar transformación logarítmica: la serie contiene valores negativos.")
-            st.stop()
-        
-        # Aplicar ln(x+1) para manejar valores cero
-        df['Ingreso'] = np.log1p(df['Ingreso'])  # ln(x+1)
-        titulo_transformacion = f"ln({serie_seleccionada}+1)"
-        unidad_medida = "log"
-    else:
-        titulo_transformacion = serie_seleccionada
-        unidad_medida = "original"
+    # Aplicar transformaciones - SIMPLIFICADO: Solo serie original
+    titulo_transformacion = serie_seleccionada
+    unidad_medida = "original"
     
     # Header de análisis
     st.header(f"📈 Análisis de: {titulo_transformacion}")
     
+    # Preproceso de fechas para análisis anuales
+    df_copy = df.copy()
+    df_copy['Fecha'] = pd.to_datetime(df_copy['Fecha'])
+    df_copy['Año'] = df_copy['Fecha'].dt.year
+    
+    # Detectar si la serie es monetaria basándose en palabras clave
+    palabras_monetarias = ['ingreso', 'precio', 'costo', 'valor', 'pago', 'venta', 'facturación', 'revenue', 'dinero', 'peso', 'dolar']
+    es_monetario = any(keyword in serie_seleccionada.lower() for keyword in palabras_monetarias)
+    prefijo_moneda = "$" if es_monetario else ""
+    
     # Mostrar estadísticas básicas con métricas nativas de Streamlit
     st.subheader("📊 Estadísticas Principales")
+    
+    # Primera fila - 4 columnas principales
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -138,12 +124,8 @@ def main():
     
     with col2:
         valor_promedio = df['Ingreso'].mean()
-        if aplicar_log:
-            valor_display = f"{valor_promedio:.4f}"
-            label_display = f"📈 Promedio ({unidad_medida})"
-        else:
-            valor_display = f"{valor_promedio:,.0f}"
-            label_display = "📈 Promedio"
+        valor_display = f"{prefijo_moneda}{valor_promedio:,.0f}"
+        label_display = "📈 Promedio"
         
         st.metric(
             label=label_display,
@@ -152,12 +134,8 @@ def main():
     
     with col3:
         valor_minimo = df['Ingreso'].min()
-        if aplicar_log:
-            valor_display = f"{valor_minimo:.4f}"
-            label_display = f"📉 Mínimo ({unidad_medida})"
-        else:
-            valor_display = f"{valor_minimo:,.0f}"
-            label_display = "📉 Mínimo"
+        valor_display = f"{prefijo_moneda}{valor_minimo:,.0f}"
+        label_display = "📉 Mínimo"
         
         st.metric(
             label=label_display,
@@ -166,16 +144,130 @@ def main():
     
     with col4:
         valor_maximo = df['Ingreso'].max()
-        if aplicar_log:
-            valor_display = f"{valor_maximo:.4f}"
-            label_display = f"📊 Máximo ({unidad_medida})"
-        else:
-            valor_display = f"{valor_maximo:,.0f}"
-            label_display = "📊 Máximo"
+        valor_display = f"{prefijo_moneda}{valor_maximo:,.0f}"
+        label_display = "📊 Máximo"
         
         st.metric(
             label=label_display,
             value=valor_display
+        )
+    
+    # Segunda fila - 4 columnas para métricas anuales
+    col5, col6, col7, col8 = st.columns(4)
+    
+    with col5:
+        # Promedio anual total
+        totales_anuales = df_copy.groupby('Año')['Ingreso'].sum()
+        promedio_anual = totales_anuales.mean()
+        valor_display = f"{prefijo_moneda}{promedio_anual:,.0f}"
+        help_text = "Promedio de los totales anuales"
+        
+        st.metric(
+            label="📅 Promedio anual",
+            value=valor_display,
+            help=help_text
+        )
+    
+    with col6:
+        # Total del año más reciente con datos completos
+        años_disponibles = sorted(df_copy['Año'].unique())
+        año_completo = None
+        
+        # Buscar el año más reciente con datos completos (12 meses)
+        for año in reversed(años_disponibles):
+            datos_año = df_copy[df_copy['Año'] == año]
+            if len(datos_año) >= 12:  # Asumiendo datos mensuales
+                año_completo = año
+                break
+        
+        if año_completo:
+            datos_año_completo = df_copy[df_copy['Año'] == año_completo]
+            total_año_completo = datos_año_completo['Ingreso'].sum()
+            
+            valor_display = f"{prefijo_moneda}{total_año_completo:,.0f}"
+            label_display = f"💰 Total {año_completo}"
+            help_text = f"Total del año {año_completo} (año más reciente con datos completos)"
+        else:
+            valor_display = "Sin datos"
+            help_text = "No hay años con datos completos"
+            label_display = f"💰 Total {2024}"
+        
+        st.metric(
+            label=label_display,
+            value=valor_display,
+            help=help_text
+        )
+    
+    with col7:
+        # Acumulado del último año disponible (año mayor)
+        # Obtener el año más reciente con datos
+        año_mayor = df_copy['Año'].max()
+        
+        # Filtrar datos solo para ese año y sumar
+        datos_año_mayor = df_copy[df_copy['Año'] == año_mayor]
+        total_acumulado = datos_año_mayor['Ingreso'].sum()
+        meses_disponibles = len(datos_año_mayor)
+        
+        valor_display = f"{prefijo_moneda}{total_acumulado:,.0f}"
+        label_display = f"📈 Acumulado {año_mayor}"
+        help_text = f"Acumulado del año {año_mayor} ({meses_disponibles} meses disponibles)"
+        
+        st.metric(
+            label=label_display,
+            value=valor_display,
+            help=help_text
+        )
+    
+    with col8:
+        # Crecimiento promedio anual
+        # Calcular totales anuales
+        totales_anuales = df_copy.groupby('Año')['Ingreso'].sum().sort_index()
+        
+        # Excluir el último año (probablemente incompleto)
+        # Solo usar años completos hasta el año anterior al último disponible
+        if len(totales_anuales) >= 2:
+            # Excluir el último año de los totales
+            totales_anuales_completos = totales_anuales.iloc[:-1]
+            
+            # Calcular crecimiento año a año solo con años completos
+            if len(totales_anuales_completos) >= 2:
+                crecimientos = []
+                años_incluidos = []
+                for i in range(1, len(totales_anuales_completos)):
+                    año_anterior = totales_anuales_completos.iloc[i-1]
+                    año_actual = totales_anuales_completos.iloc[i]
+                    if año_anterior > 0:  # Evitar división por cero
+                        crecimiento = ((año_actual - año_anterior) / año_anterior) * 100
+                        crecimientos.append(crecimiento)
+                        años_incluidos.append(f"{totales_anuales_completos.index[i-1]}-{totales_anuales_completos.index[i]}")
+                
+                if crecimientos:
+                    crecimiento_promedio = sum(crecimientos) / len(crecimientos)
+                    valor_display = f"{crecimiento_promedio:+.1f}%"
+                    
+                    # Mostrar rango de años completos en el título
+                    año_inicio = totales_anuales_completos.index[0]
+                    año_fin = totales_anuales_completos.index[-1]
+                    label_display = f"📈 % Crecimiento ({año_inicio}-{año_fin})"
+                    
+                    help_text = f"Promedio de {len(crecimientos)} períodos (años completos): {', '.join(años_incluidos)}"
+                else:
+                    valor_display = "N/A"
+                    label_display = "📈 % Crecimiento promedio"
+                    help_text = "No se puede calcular sin datos válidos"
+            else:
+                valor_display = "N/A"
+                label_display = "📈 % Crecimiento promedio"
+                help_text = "Se requieren al menos 2 años completos de datos"
+        else:
+            valor_display = "N/A"
+            label_display = "📈 % Crecimiento promedio"
+            help_text = "Se requieren al menos 2 años de datos"
+        
+        st.metric(
+            label=label_display,
+            value=valor_display,
+            help=help_text
         )
 
     try:
@@ -269,16 +361,8 @@ def main():
         
                     """)
         
-        # Información adicional sobre la transformación (fuera de tabs)
-        if aplicar_log:
-            st.info("""
-            ℹ️ **Información sobre la Transformación Logarítmica:**
-            
-            - **Transformación aplicada:** ln(x+1) para manejar valores cero de forma segura
-            - **Propósito:** Estabilizar la varianza y linearizar tendencias exponenciales
-            - **Escala actual:** Logarítmica natural
-            - **Conversión inversa:** exp(valor_transformado) - 1
-            """)
+        # Información adicional - SIMPLIFICADA
+        # Se removieron las transformaciones para simplificar la experiencia del usuario final
             
     except Exception as e:
         st.error(f"❌ Error procesando los datos: {str(e)}")

@@ -208,7 +208,7 @@ def create_forecast_chart(historical_df, forecast_df):
             name='Datos Históricos',
             line=dict(color='#2E86AB', width=3),
             marker=dict(size=6),
-            hovertemplate='<b>Fecha:</b> %{x}<br><b>Ingresos:</b> $%{y:,.0f}M COP<extra></extra>'
+            hovertemplate='<b>Fecha:</b> %{x}<br><b>Ingresos Históricos:</b> $%{y:,.0f}M COP<extra></extra>'
         ))
     
     # Pronósticos
@@ -221,7 +221,8 @@ def create_forecast_chart(historical_df, forecast_df):
             name='Pronóstico Híbrido (ESM)',
             line=dict(color='#F18F01', width=3, dash='dash'),
             marker=dict(size=8, symbol='diamond'),
-            hovertemplate='<b>Fecha:</b> %{x}<br><b>Pronóstico:</b> $%{y:,.0f}M COP<extra></extra>'
+            hovertemplate='<b>Fecha:</b> %{x}<br><b>Pronóstico:</b> $%{y:,.0f}M COP<extra></extra>',
+            hoverlabel=dict(namelength=-1)
         ))
         
         # Intervalo de confianza 95%
@@ -243,7 +244,7 @@ def create_forecast_chart(historical_df, forecast_df):
             line=dict(width=0),
             fill='tonexty',
             fillcolor='rgba(241, 143, 1, 0.2)',
-            hovertemplate='<b>Fecha:</b> %{x}<br><b>IC 95%:</b> $%{y:,.0f}M COP<extra></extra>'
+            hoverinfo='skip'
         ))
         
         # Intervalo de confianza 90%
@@ -265,7 +266,7 @@ def create_forecast_chart(historical_df, forecast_df):
             line=dict(width=0),
             fill='tonexty',
             fillcolor='rgba(241, 143, 1, 0.4)',
-            hovertemplate='<b>Fecha:</b> %{x}<br><b>IC 90%:</b> $%{y:,.0f}M COP<extra></extra>'
+            hoverinfo='skip'
         ))
     
     # Personalizar el gráfico
@@ -278,7 +279,8 @@ def create_forecast_chart(historical_df, forecast_df):
         },
         xaxis_title='Fecha',
         yaxis_title='Ingresos (Millones COP)',
-        hovermode='x unified',
+        hovermode='closest',
+        hoverdistance=100,
         showlegend=True,
         legend=dict(
             orientation="h",
